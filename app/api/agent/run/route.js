@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin, log } from "../../../../lib/supabase";
-import { discoverProducts } from "../../../../lib/sources";
-import { analyze } from "../../../../lib/brain";
-import { postEverywhere } from "../../../../lib/social";
-
-// CATATAN: maxDuration DIHAPUS agar kompatibel dengan Vercel Gratis (Hobby)
+import { supabaseAdmin, log } from "@/lib/supabase";
+import { discoverProducts } from "@/lib/sources";
+import { analyze } from "@/lib/brain";
+import { postEverywhere } from "@/lib/social";
 
 async function runAgent() {
   const sb = supabaseAdmin();
   const dailyBudget = Number(process.env.DAILY_AD_BUDGET || 20);
 
+  // 1. Baca pengaturan
   const { data: sRows } = await sb.from("settings").select("*");
   const s = Object.fromEntries((sRows || []).map((r) => [r.key, r.value]));
   const keywords = (s.keywords || "").split(",").map((k) => k.trim()).filter(Boolean);
@@ -19,6 +18,7 @@ async function runAgent() {
 
   await log(`🔎 Mulai cari produk. Negara: ${countries.join(",")}`);
 
+  // 2. Cari produk
   const found = await discoverProducts(keywords, countries);
   await log(`📦 Ditemukan ${found.length} produk kandidat`);
 
@@ -26,9 +26,11 @@ async function runAgent() {
   for (const p of found) {
     if (p.commission_rate < minCommission) continue;
 
+    // Cek duplikat
     const { data: exist } = await sb.from("products").select("id").eq("url", p.url).maybeSingle();
     if (exist) continue;
 
+    // 3. Analisa AI
     const a = await analyze(p, dailyBudget);
 
     const { data: prod } = await sb.from("products")
@@ -38,20 +40,32 @@ async function runAgent() {
     await log(`🧠 "${p.title}" → skor ${a.score} → ${a.platform}`);
     if (a.score < 45) continue;
 
+    // 4. Buat campaign
     const { data: camp } = await sb.from("campaigns")
       .insert({
-        product_id: prod.id, platform: a.platform, daily_budget: a.daily_budget,
-        duration_days: a.duration_days, target_audience: a.target_audience,
-        hook: a.hook, caption: a.caption, hashtags: a.hashtags,
-        reasoning: a.reasoning, expected_roi: a.expected_roi, status: "aktif",
+        product_id: prod.id,
+        platform: a.platform,
+        daily_budget: a.daily_budget,
+        duration_days: a.duration_days,
+        target_audience: a.target_audience,
+        hook: a.hook,
+        caption: a.caption,
+        hashtags: a.hashtags,
+        reasoning: a.reasoning,
+        expected_roi: a.expected_roi,
+        status: "aktif",
       }).select().single();
 
+    // 5. Auto posting
     if (autoPost && camp) {
       const results = await postEverywhere(`${a.caption}\n\n${a.hashtags}`, p.affiliate_url);
       for (const r of results) {
         await sb.from("posts").insert({
-          campaign_id: camp.id, channel: r.channel, content: a.caption,
-          status: r.ok ? "terkirim" : "gagal", response: r.response,
+          campaign_id: camp.id,
+          channel: r.channel,
+          content: a.caption,
+          status: r.ok ? "terkirim" : "gagal",
+          response: r.response,
         });
       }
       await log(`📤 Posting "${p.title}" ke ${results.map((r) => r.channel).join(", ")}`);

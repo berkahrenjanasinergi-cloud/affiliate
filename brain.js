@@ -1,17 +1,13 @@
-// Menentukan: produk ini layak? skor berapa? iklan di mana? budget berapa?
-
 function ruleBasedAnalysis(p, dailyBudget) {
-  // Skor 0-100 dari rumus sederhana
-  const commissionScore = Math.min(p.commission_rate * 4, 40);      // maks 40
-  const demandScore = Math.min(Math.log10(p.sold_count + 1) * 8, 30); // maks 30
-  const trustScore = Math.min((p.rating - 3) * 15, 30);              // maks 30
+  const commissionScore = Math.min(p.commission_rate * 4, 40);
+  const demandScore = Math.min(Math.log10(p.sold_count + 1) * 8, 30);
+  const trustScore = Math.min((p.rating - 3) * 15, 30);
   const score = Math.round(commissionScore + demandScore + trustScore);
 
-  // Pilih platform iklan berdasarkan kategori & harga
   let platform = "meta_ads";
   if (["skincare", "fashion", "gadget"].includes(p.category)) platform = "tiktok_ads";
   if (p.price > 400000) platform = "google_ads";
-  if (score < 45) platform = "organic"; // jangan buang uang
+  if (score < 45) platform = "organic";
 
   const budgetShare = score >= 80 ? 0.4 : score >= 65 ? 0.25 : score >= 45 ? 0.1 : 0;
   const daily_budget = Math.round(dailyBudget * budgetShare * 100) / 100;
@@ -25,10 +21,7 @@ function ruleBasedAnalysis(p, dailyBudget) {
   };
 
   return {
-    score,
-    platform,
-    daily_budget,
-    duration_days: score >= 65 ? 7 : 3,
+    score, platform, daily_budget, duration_days: score >= 65 ? 7 : 3,
     target_audience: `${p.country} · usia 18-35 · minat ${p.category}`,
     hook: hooks[p.category] || `Produk ${p.category} terlaris minggu ini!`,
     caption: `${hooks[p.category] || ""}\n\n${p.title}\n⭐ ${p.rating} · ${p.sold_count.toLocaleString()} terjual\n💰 Cek harga promo di link!`,
@@ -42,26 +35,17 @@ async function openAiAnalysis(p, dailyBudget) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
 
-  const prompt = `Kamu adalah ahli affiliate marketing e-commerce ASEAN.
-Produk: ${JSON.stringify(p)}
-Budget iklan total harian: ${dailyBudget} USD.
-Balas HANYA JSON dengan field:
-score (0-100), platform (tiktok_ads|meta_ads|google_ads|organic), daily_budget (USD),
-duration_days, target_audience, hook, caption (bahasa lokal negara ${p.country}, singkat, ada CTA),
-hashtags, reasoning (bahasa Indonesia, 2 kalimat), expected_roi (angka).`;
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-    }),
-  }).then((r) => r.json());
-
   try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: `Analisa produk affiliate ini dan balas HANYA JSON: ${JSON.stringify(p)}. Budget harian: ${dailyBudget} USD.` }],
+        response_format: { type: "json_object" },
+        temperature: 0.4,
+      }),
+    }).then((r) => r.json());
     return JSON.parse(res.choices[0].message.content);
   } catch {
     return null;

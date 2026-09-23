@@ -33,13 +33,8 @@ export default function Home() {
 
   useEffect(() => {
     loadAll();
-    // REALTIME: tiap ada data baru, dashboard refresh sendiri
-    const ch = sb
-      .channel("dashboard")
-      .on("postgres_changes", { event: "*", schema: "public" }, () => loadAll())
-      .subscribe();
+    const ch = sb.channel("dashboard").on("postgres_changes", { event: "*", schema: "public" }, () => loadAll()).subscribe();
     return () => sb.removeChannel(ch);
-    // eslint-disable-next-line
   }, []);
 
   async function runAgent() {
@@ -51,8 +46,7 @@ export default function Home() {
 
   async function saveSettings() {
     await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     });
     alert("Tersimpan ✅");
@@ -60,10 +54,10 @@ export default function Home() {
 
   async function repost(campaign_id) {
     await fetch("/api/post", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ campaign_id }),
     });
+    alert("Perintah posting dikirim! ✅");
   }
 
   const totalBudget = campaigns.reduce((a, c) => a + Number(c.daily_budget || 0), 0);
@@ -87,22 +81,19 @@ export default function Home() {
       </div>
 
       <div className="card">
-        <h2>⚙️ Pengaturan (opsional)</h2>
+        <h2>⚙️ Pengaturan</h2>
         <div className="row">
-          <input placeholder="Kata kunci: skincare,gadget,fashion" value={settings.keywords}
-            onChange={(e) => setSettings({ ...settings, keywords: e.target.value })} />
-          <input placeholder="Negara: ID,MY,SG,TH,PH,VN" value={settings.countries}
-            onChange={(e) => setSettings({ ...settings, countries: e.target.value })} />
-          <input placeholder="Min komisi %" value={settings.min_commission_rate}
-            onChange={(e) => setSettings({ ...settings, min_commission_rate: e.target.value })} />
+          <input placeholder="Kata kunci: skincare,gadget" value={settings.keywords} onChange={(e) => setSettings({ ...settings, keywords: e.target.value })} />
+          <input placeholder="Negara: ID,MY,SG" value={settings.countries} onChange={(e) => setSettings({ ...settings, countries: e.target.value })} />
+          <input placeholder="Min komisi %" value={settings.min_commission_rate} onChange={(e) => setSettings({ ...settings, min_commission_rate: e.target.value })} />
           <button className="mini" onClick={saveSettings}>Simpan</button>
         </div>
       </div>
 
       <div className="card">
-        <h2>🏆 Produk Potensial (urut skor)</h2>
+        <h2>🏆 Produk Potensial</h2>
         <table>
-          <thead><tr><th>Skor</th><th>Produk</th><th>Toko</th><th>Komisi</th><th>Terjual</th><th>Link</th></tr></thead>
+          <thead><tr><th>Skor</th><th>Produk</th><th>Toko</th><th>Komisi</th><th>Link</th></tr></thead>
           <tbody>
             {products.map((p) => (
               <tr key={p.id}>
@@ -110,11 +101,10 @@ export default function Home() {
                 <td>{p.title}<br /><span className="small">{p.category} · ⭐{p.rating}</span></td>
                 <td>{p.marketplace} {p.country}</td>
                 <td>{p.commission_rate}%</td>
-                <td>{Number(p.sold_count).toLocaleString()}</td>
                 <td><a href={p.affiliate_url} target="_blank" rel="noreferrer">Buka</a></td>
               </tr>
             ))}
-            {products.length === 0 && <tr><td colSpan={6} className="small">Belum ada. Tekan tombol 🚀 di atas.</td></tr>}
+            {products.length === 0 && <tr><td colSpan={5} className="small">Belum ada. Tekan tombol 🚀 di atas.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -122,37 +112,18 @@ export default function Home() {
       <div className="card">
         <h2>📢 Strategi Iklan & Campaign</h2>
         <table>
-          <thead><tr><th>Produk</th><th>Iklan di</th><th>Budget/hari</th><th>Durasi</th><th>Target</th><th>Alasan AI</th><th></th></tr></thead>
+          <thead><tr><th>Produk</th><th>Iklan di</th><th>Budget/hari</th><th>Alasan AI</th><th></th></tr></thead>
           <tbody>
             {campaigns.map((c) => (
               <tr key={c.id}>
                 <td>{c.products?.title}</td>
                 <td><b>{c.platform}</b></td>
                 <td>${c.daily_budget}</td>
-                <td>{c.duration_days} hari</td>
-                <td className="small">{c.target_audience}</td>
-                <td className="small">{c.reasoning}<br /><i>Hook: {c.hook}</i></td>
+                <td className="small">{c.reasoning}</td>
                 <td><button className="mini" onClick={() => repost(c.id)}>Posting</button></td>
               </tr>
             ))}
-            {campaigns.length === 0 && <tr><td colSpan={7} className="small">Belum ada campaign.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <h2>📤 Riwayat Posting Sosmed</h2>
-        <table>
-          <thead><tr><th>Waktu</th><th>Channel</th><th>Status</th><th>Isi</th></tr></thead>
-          <tbody>
-            {posts.map((p) => (
-              <tr key={p.id}>
-                <td className="small">{new Date(p.created_at).toLocaleString("id-ID")}</td>
-                <td>{p.channel}</td>
-                <td><span className={`badge ${p.status === "terkirim" ? "hi" : "lo"}`}>{p.status}</span></td>
-                <td className="small">{(p.content || "").slice(0, 100)}...</td>
-              </tr>
-            ))}
+            {campaigns.length === 0 && <tr><td colSpan={5} className="small">Belum ada campaign.</td></tr>}
           </tbody>
         </table>
       </div>
